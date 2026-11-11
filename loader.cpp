@@ -1,6 +1,6 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
-#include "caralho.hpp"
+#include "loader.hpp"
 #include <algorithm>
 #include <cstdio>
 #include <fstream>
@@ -57,10 +57,18 @@ std::map<std::string, Mtl> lerMtl(const std::string& caminho){
 }
 
 void aplicarMtl(const Mtl& m){
-    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT,  m.ka);
-    glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE,  m.kd);
-    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, m.ks);
-    glMaterialf (GL_FRONT_AND_BACK, GL_SHININESS, m.ns);
+    GLfloat kd[4] = { m.kd[0], m.kd[1], m.kd[2], 1.0f };
+    GLfloat ka[4] = { m.kd[0], m.kd[1], m.kd[2], 1.0f };   // ambiente = difuso
+    GLfloat ks[4] = { m.ks[0] * 0.2f, m.ks[1] * 0.2f, m.ks[2] * 0.2f, 1.0f };
+
+    float shininess = m.ns * 128.0f / 1000.0f;
+    if (shininess < 1.0f)   shininess = 1.0f;
+    if (shininess > 128.0f) shininess = 128.0f;
+
+    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT,   ka);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE,   kd);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR,  ks);
+    glMaterialf (GL_FRONT_AND_BACK, GL_SHININESS, shininess);
 }
 
 GLuint carregarTextura(const std::string& caminho, bool avisar){

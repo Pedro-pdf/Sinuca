@@ -1,9 +1,17 @@
-#ifndef HUMANO_H
-#define HUMANO_H
+#ifndef ELEMENTOS_H
+#define ELEMENTOS_H
 
-class Bola{
-    eeki uewrru fer igfewru guyrg
-}
+#include <algorithm>
+#include <cstdio>
+
+class Mesa{
+    public:
+        Mesa(unsigned MesaId);
+
+        void desenhar();
+
+        unsigned MesaId;
+};
 
 
 

@@ -1,5 +1,5 @@
-#ifndef HUMANO_H
-#define HUMANO_H
+#ifndef LOADER_H
+#define lOADER_H
 #include <string>
 #include <iostream>
 
