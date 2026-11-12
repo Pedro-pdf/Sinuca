@@ -58,8 +58,8 @@ std::map<std::string, Mtl> lerMtl(const std::string& caminho){
 
 void aplicarMtl(const Mtl& m){
     GLfloat kd[4] = { m.kd[0], m.kd[1], m.kd[2], 1.0f };
-    GLfloat ka[4] = { m.kd[0], m.kd[1], m.kd[2], 1.0f };   // ambiente = difuso
-    GLfloat ks[4] = { m.ks[0] * 0.2f, m.ks[1] * 0.2f, m.ks[2] * 0.2f, 1.0f };
+    GLfloat ka[4] = { m.kd[0], m.kd[1], m.kd[2], 1.0f };
+    GLfloat ks[4] = { m.ks[0], m.ks[1], m.ks[2], 1.0f };
 
     float shininess = m.ns * 128.0f / 1000.0f;
     if (shininess < 1.0f)   shininess = 1.0f;
