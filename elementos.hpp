@@ -34,10 +34,8 @@ class Taco{
         unsigned TacoId;
         float x, y, z;
         float comprimento = 1.50102;
-        float dx = 1, dy = 0, dz = 0;
-        float ex = 1, ey = 0, ez = 0;
-        float pontaX = 0, pontaY = 0, pontaZ = 0;
-        float inclinacao = 8;
+        float elevTaco;
+        float theta;
 };
 
 

@@ -25,21 +25,10 @@ Taco::Taco(unsigned TacoId, float x, float y, float z)
     : TacoId(TacoId), x(x), y(y), z(z) {}
 
 void Taco::desenhar(){
-    float ax = ey*dz - ez*dy;
-    float ay = ez*dx - ex*dz;
-    float az = ex*dy - ey*dx;
-    float seno   = sqrt(ax*ax + ay*ay + az*az);
-    float cosseno = ex*dx + ey*dy + ez*dz;
-
     glPushMatrix();
-    glTranslatef(x, y, z);
-    if (seno > 0){
-        glRotatef(atan2(seno, cosseno) * 180.0f / 3.14f, ax/seno, ay/seno, az/seno);
-    }
-    else if (cosseno < 0){
-        glRotatef(180, 0,1,0);
-    }
-    glTranslatef(-pontaX, -pontaY, -pontaZ);
+    glTranslatef(x,y,z);
+    glRotatef(-theta, 0, 1, 0);
+    glRotatef(elevTaco, 0, 0, 1);
     glCallList(TacoId);
     glPopMatrix();
 }

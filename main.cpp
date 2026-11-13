@@ -12,7 +12,7 @@ float ALVO_X = 0.0f, ALVO_Y = 0.0f, ALVO_Z = 0.0f;
 float raio = 2.0;
 int phy = 70;
 int theta = 0;
-int limitSPhy = 70;
+int limitSPhy = 80;
 int limitBPhy = 30;
 
 float raioMin = 0.5f;
@@ -99,19 +99,13 @@ void Desenha(void){
     bolaBranca->desenhar();
     
     if(estado == MIRANDO){
-        float hx = CAM_X - ALVO_X;
-        float hz = CAM_Z - ALVO_Z;
-        float h = sqrt(hx*hx + hz*hz);
-
-        float a = taco->inclinacao * 3.14 / 180.0f;
-        taco->dx = hx * cos(a);
-        taco->dy = sin(a);
-        taco->dz = hz * cos(a);
-
-        float dist = bolaBranca->Raio + 0.3;
-        taco->x = ALVO_X + taco->dx * dist;
-        taco->y = ALVO_Y + taco->dy * dist;
-        taco->z = ALVO_Z + taco->dz * dist;
+        float distancia = bolaBranca->Raio + 0.05;
+        float phyTaco = phy + 8.0f;
+        taco->elevTaco = 90 - phyTaco;
+        taco->theta = theta;
+        taco->x = ALVO_X + sin((phyTaco*3.14)/180)*cos((theta*3.14)/180)*distancia;
+        taco->y = ALVO_Y + cos((phyTaco*3.14)/180)*distancia;
+        taco->z = ALVO_Z + sin((phyTaco*3.14)/180)*sin((theta*3.14)/180)*distancia;
         taco->desenhar();
     }
     
@@ -122,20 +116,34 @@ void idle() {
     glutPostRedisplay();
 }
 
-void tecladoMira(unsigned char tecla){
+void teclado(unsigned char tecla, int x, int y) {
     switch (tecla) {
-        case 'a':
-            theta = (theta+2)%360;
+        case 27:
+            exit(0);
             break;
 
-        case 'd':
-            theta = (theta-2)%360;
+        case 13:
+            if(estado == CAMERA_LIVRE){
+                estado = MIRANDO;
+                raio = 0.5;
+                raioMax = 1.5;
+                limitSPhy = 70;
+                limitBPhy = 40;
+                ALVO_X = bolaBranca->x;
+                ALVO_Y = bolaBranca->y;
+                ALVO_Z = bolaBranca->z;
+            }
+            else if(estado == MIRANDO){
+                estado = CAMERA_LIVRE;
+                raio = 1.0;
+                limitSPhy = 80;
+                limitBPhy = 30;
+                ALVO_X = 0.0;
+                ALVO_Y = 0.0;
+                ALVO_Z = 0.0;
+            }
             break;
-    }
-}
 
-void tecladoLivre(unsigned char tecla){
-    switch (tecla) {
         case 'w':
             phy -= 2;
             if(phy < limitBPhy){
@@ -158,42 +166,6 @@ void tecladoLivre(unsigned char tecla){
             theta = (theta-2)%360;
             break;
     }
-}
-
-
-void teclado(unsigned char tecla, int x, int y) {
-    switch (tecla) {
-        case 27:
-            exit(0);
-            break;
-
-        case 13:
-            if(estado == CAMERA_LIVRE){
-                estado = MIRANDO;
-                raio = 0.5;
-                phy = limitSPhy-5;
-                ALVO_X = bolaBranca->x;
-                ALVO_Y = bolaBranca->y;
-                ALVO_Z = bolaBranca->z;
-            }
-            else if(estado == MIRANDO){
-                estado = CAMERA_LIVRE;
-                raio = 1.0;
-                ALVO_X = 0.0;
-                ALVO_Y = 0.0;
-                ALVO_Z = 0.0;
-            }
-            break;
-    }
-    switch (estado){
-        case CAMERA_LIVRE:
-            tecladoLivre(tecla);
-            break;
-
-        case MIRANDO:
-            tecladoMira(tecla);
-            break;
-    }
 
     glutPostRedisplay();
 }
@@ -202,10 +174,10 @@ void scroll(int botao, int status, int x, int y) {
     if(status != GLUT_DOWN){
         return;
     }
-    if (botao == 3 && estado == CAMERA_LIVRE){
+    if (botao == 3){
         zoom(-0.5f);
     }
-    else if(botao == 4 && estado == CAMERA_LIVRE){
+    else if(botao == 4){
         zoom(+0.5f);
     }
 }
