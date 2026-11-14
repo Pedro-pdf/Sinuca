@@ -256,14 +256,14 @@ void atualizaCena(int valor){
             break;
 
         case BOLA_EM_MOVIMENTO:
+            raio = 2.0;
+            phy = 70;
+            theta = 90;
             for (int i = 0; i < SUBSTEPS; i++) {
                 bolaBranca->atualizaPosicao(h);
             }
             if(!bolaBranca->estaAtiva()){
                 estado = CAMERA_LIVRE;
-                raio = 2.0;
-                phy = 70;
-                theta = 90;
             }
             break;
             
