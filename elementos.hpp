@@ -20,9 +20,16 @@ class Bola{
 
         void desenhar();
 
+        void atualizaPosicao(float h);
+
+        bool estaAtiva();
+
         unsigned BolaId;
         float x, y, z;
         float Raio = 0.025486;
+        float Vx = 0;
+        float Vz = 0;
+        bool ativa = 0;
 };
 
 class Taco{

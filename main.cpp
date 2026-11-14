@@ -22,8 +22,23 @@ Mesa* mesa = nullptr;
 Bola* bolaBranca = nullptr;
 Taco* taco = nullptr;
 
-enum Estado { CAMERA_LIVRE, MIRANDO, FORCA, BOLA_EM_MOVIMENTO };
+enum Estado { CAMERA_LIVRE, MIRANDO, FORCA, IMPACTO, PAUSA_IMPACTO, BOLA_EM_MOVIMENTO };
 Estado estado = CAMERA_LIVRE;
+
+float distanciaTaco = 0.15;
+float distanciaTMax = 0.3;
+float distanciaTMin = 0.15;
+int sentido = 1.0;
+
+float t;
+float velocidade;
+float velHorizontal;
+
+float dt = 1.0f/60.0f;
+float SUBSTEPS = 10.0;
+float h = dt/SUBSTEPS;
+
+int contadorPausa;
 
 void configuraVisualizacao(void){
     glMatrixMode(GL_MODELVIEW);
@@ -45,8 +60,6 @@ void zoom(float delta) {
     if (raio > raioMax) raio = raioMax;
     glutPostRedisplay();
 }
-
-
 
 void AlteraTamanhoJanela(GLsizei w, GLsizei h)
 {
@@ -98,22 +111,21 @@ void Desenha(void){
     mesa->desenhar();
     bolaBranca->desenhar();
     
-    if(estado == MIRANDO){
-        float distancia = bolaBranca->Raio + 0.05;
+    if(estado == MIRANDO || estado == FORCA || estado == IMPACTO){
+        float raioTaco = distanciaTaco + bolaBranca->Raio;
         float phyTaco = phy + 8.0f;
         taco->elevTaco = 90 - phyTaco;
         taco->theta = theta;
-        taco->x = ALVO_X + sin((phyTaco*3.14)/180)*cos((theta*3.14)/180)*distancia;
-        taco->y = ALVO_Y + cos((phyTaco*3.14)/180)*distancia;
-        taco->z = ALVO_Z + sin((phyTaco*3.14)/180)*sin((theta*3.14)/180)*distancia;
+        taco->x = ALVO_X + sin((phyTaco*3.14)/180)*cos((theta*3.14)/180)*raioTaco;
+        taco->y = ALVO_Y + cos((phyTaco*3.14)/180)*raioTaco;
+        taco->z = ALVO_Z + sin((phyTaco*3.14)/180)*sin((theta*3.14)/180)*raioTaco;
+        taco->desenhar();
+    }
+    else if(estado == PAUSA_IMPACTO){
         taco->desenhar();
     }
     
     glutSwapBuffers();
-}
-
-void idle() {
-    glutPostRedisplay();
 }
 
 void teclado(unsigned char tecla, int x, int y) {
@@ -142,29 +154,60 @@ void teclado(unsigned char tecla, int x, int y) {
                 ALVO_Y = 0.0;
                 ALVO_Z = 0.0;
             }
+            else if(estado == FORCA){
+                estado = MIRANDO;
+            }
+            break;
+
+        case ' ':
+            if(estado == MIRANDO){
+                estado = FORCA;
+            }
+            else if(estado == FORCA){
+                estado = IMPACTO;
+                raio = 1.0;
+                limitSPhy = 80;
+                limitBPhy = 30;
+                ALVO_X = 0.0;
+                ALVO_Y = 0.0;
+                ALVO_Z = 0.0;
+                t = (distanciaTaco - 0.15f) / (0.30f - 0.15f);
+                velocidade = 0.35f + t * t * (7.0f - 0.35f);
+                velHorizontal = velocidade * cos((taco->elevTaco*3.14)/180.0);
+                bolaBranca->Vx = velHorizontal * -cos((theta*3.14)/180.0);
+                bolaBranca->Vz = velHorizontal * -sin((theta*3.14)/180.0);
+            }
             break;
 
         case 'w':
-            phy -= 2;
-            if(phy < limitBPhy){
-                phy = limitBPhy;
+            if(estado != FORCA){
+                phy -= 2;
+                if(phy < limitBPhy){
+                    phy = limitBPhy;
+                }
+                break;
             }
-            break;
 
         case 's':
-            phy += 2;
-            if(phy > limitSPhy){
-                phy = limitSPhy;
+            if(estado != FORCA){
+                phy += 2;
+                if(phy > limitSPhy){
+                    phy = limitSPhy;
+                }
+                break;
             }
-            break;
 
         case 'a':
-            theta = (theta+2)%360;
-            break;
+            if(estado != FORCA){
+                theta = (theta+2)%360;
+                break;
+            }
 
         case 'd':
-            theta = (theta-2)%360;
-            break;
+            if(estado != FORCA){
+                theta = (theta-2)%360;
+                break;
+            }
     }
 
     glutPostRedisplay();
@@ -180,6 +223,54 @@ void scroll(int botao, int status, int x, int y) {
     else if(botao == 4){
         zoom(+0.5f);
     }
+}
+
+void atualizaCena(int valor){
+    switch(estado){
+        case FORCA:
+            distanciaTaco += 0.005 * sentido;
+            if(distanciaTaco > distanciaTMax){
+                distanciaTaco = distanciaTMax;
+                sentido *= -1;
+            }
+            else if(distanciaTaco < distanciaTMin){
+                distanciaTaco = distanciaTMin;
+                sentido *= -1;
+            }
+            break;
+
+        case IMPACTO:
+            distanciaTaco -= 0.05;
+            if(distanciaTaco <= 0.0){
+                distanciaTaco = distanciaTMin;
+                contadorPausa = 0;
+                estado = BOLA_EM_MOVIMENTO;
+            }
+            break;
+
+        case PAUSA_IMPACTO:
+            contadorPausa++;
+            if(contadorPausa >= 30){
+                estado = CAMERA_LIVRE;
+            }
+            break;
+
+        case BOLA_EM_MOVIMENTO:
+            for (int i = 0; i < SUBSTEPS; i++) {
+                bolaBranca->atualizaPosicao(h);
+            }
+            if(!bolaBranca->estaAtiva()){
+                estado = CAMERA_LIVRE;
+                raio = 2.0;
+                phy = 70;
+                theta = 90;
+            }
+            break;
+            
+    }
+
+    glutPostRedisplay();
+    glutTimerFunc(16, atualizaCena, 0);
 }
 
 int main(int argc, char** argv){
@@ -202,10 +293,15 @@ int main(int argc, char** argv){
     glutDisplayFunc(Desenha);
     glutReshapeFunc(AlteraTamanhoJanela);
     glutKeyboardFunc(teclado);
-    glutIdleFunc(idle);
-    glutKeyboardFunc(teclado);
     glutMouseFunc(scroll);
+    glutTimerFunc(16, atualizaCena, 0);
 
     glutMainLoop();
     return 0;
 }
+
+
+
+//2.36
+//0.19397
+//1.37

@@ -21,6 +21,33 @@ void Bola::desenhar(){
     glPopMatrix();
 }
 
+void Bola::atualizaPosicao(float h){
+    float velocidade = sqrt(Vx*Vx + Vz*Vz);
+    float atrito = 0.3 * 10.0;
+
+    if(velocidade > atrito*h){
+        float ax = -(Vx/velocidade)*atrito;
+        float az = -(Vz/velocidade)*atrito;
+
+        Vx = Vx + ax*h;
+        Vz = Vz + az*h;
+        
+        x = x + Vx*h;
+        z = z+ Vz*h;
+    }
+    else{
+        Vx = 0.0;
+        Vz = 0.0;
+    }
+}
+
+bool Bola::estaAtiva(){
+    if(Vx == 0.0 && Vz == 0.0){
+        return 0;
+    }
+    return 1;
+}
+
 Taco::Taco(unsigned TacoId, float x, float y, float z)
     : TacoId(TacoId), x(x), y(y), z(z) {}
 
