@@ -9,6 +9,12 @@ class Box{
         float xmax, xmin, zmax, zmin;
 };
 
+class Cacapa{
+    public:
+        float xCa, zCa;
+        float raioCa = 0.058;
+};
+
 class Mesa{
     public:
         Mesa(unsigned MesaId);
@@ -18,6 +24,7 @@ class Mesa{
         unsigned MesaId;
         float Ymesa = 0.115898;
         Box boxMesa[6];
+        Cacapa cacapaMesa[6];
 
 };
 
@@ -31,14 +38,25 @@ class Bola{
 
         void colisaoParede(Box box);
 
+        bool caindoCacapa(Cacapa ca);
+
+        void inicioQueda(Cacapa ca);
+
+        void Queda(float dt);
+
         bool estaAtiva();
 
         unsigned BolaId;
         float x, y, z;
         float Raio = 0.025486;
         float Vx = 0;
+        float Vy = 0;
         float Vz = 0;
-        bool ativa = 0;
+        float cx;
+        float cz;
+        float tempoQueda;
+        bool emJogo = true;
+        bool caindo = false;
 };
 
 class Taco{
@@ -53,7 +71,5 @@ class Taco{
         float elevTaco;
         float theta;
 };
-
-
 
 #endif

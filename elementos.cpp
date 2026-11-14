@@ -3,6 +3,8 @@
 #include <math.h>
 #include <GL/glut.h>
 
+float FUNDOCA = 0.03;
+
 Mesa::Mesa(unsigned MesaId) : MesaId(MesaId) {
     boxMesa[0] = {1.20978, 1.08186, 0.485328, -0.48294};
     boxMesa[1] = {-1.08197, -1.08197, 0.485328, -0.48294};
@@ -10,6 +12,13 @@ Mesa::Mesa(unsigned MesaId) : MesaId(MesaId) {
     boxMesa[3] = {1.02645, 0.057337, 0.672339, 0.544464};
     boxMesa[4] = {-0.057452, -1.02656, -0.542077, -0.669951};
     boxMesa[5] = {-0.057452, -1.02656, 0.672339, 0.544464};
+
+    cacapaMesa[0] = {1.11006, 0.570423};
+    cacapaMesa[1] = {1.11006, -0.570423};
+    cacapaMesa[2] = {-1.11006, -0.570423};
+    cacapaMesa[3] = {-1.11006, 0.570423};
+    cacapaMesa[4] = {-0.000057, -0.587131};
+    cacapaMesa[5] = {-0.000057, 0.587131};
 }
 
 void Mesa::desenhar(){
@@ -71,6 +80,48 @@ void Bola::colisaoParede(Box box){
 
     Vx = Vx -(1+e)*(Vx*nx + Vz*nz)*nx;
     Vz = Vz -(1+e)*(Vx*nx + Vz*nz)*nz;
+}
+
+bool Bola::caindoCacapa(Cacapa ca){
+    float dx = x - ca.xCa;
+    float dz = z - ca.zCa;
+    float d = sqrt(dx*dx + dz*dz);
+
+    return d <= ca.raioCa;
+}
+
+void Bola::inicioQueda(Cacapa ca){
+    caindo = true;
+    emJogo = false;
+    tempoQueda = 0;
+    Vy = 0;
+    cx = ca.xCa;
+    cz = ca.zCa;
+    Vx = 0;
+    Vz = 0;
+}
+
+void Bola::Queda(float dt){
+    if(!caindo){
+        return;
+    }
+
+    tempoQueda += dt;
+
+    if (tempoQueda < 0.15f) {
+        float f = dt / 0.15f;
+        x += (cx - x) * f;
+        z += (cz - z) * f;
+    }
+
+    Vy -= 10 * dt;
+    y  += Vy * dt;
+    if(y <= FUNDOCA){
+        y = FUNDOCA;
+    }
+
+    if (tempoQueda >= 1.0) caindo = false;
+
 }
 
 bool Bola::estaAtiva(){

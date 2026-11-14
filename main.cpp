@@ -38,6 +38,8 @@ float dt = 1.0f/60.0f;
 float SUBSTEPS = 5.0;
 float h = dt/SUBSTEPS;
 
+vec3 posiInic(0,0,0);
+
 void configuraVisualizacao(void){
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
@@ -246,13 +248,30 @@ void atualizaCena(int valor){
             raio = 2.0;
             phy = 70;
             theta = 90;
+            bolaBranca->Queda(dt);
             for (int i = 0; i < SUBSTEPS; i++) {
-                bolaBranca->atualizaPosicao(h);
-                for(int i = 0; i < 6; i++){
-                    bolaBranca->colisaoParede(mesa->boxMesa[i]);
+                if(bolaBranca->emJogo){
+                    bolaBranca->atualizaPosicao(h);
+                    for (int k = 0; k < 6; k++){
+                        if(bolaBranca->caindoCacapa(mesa->cacapaMesa[k])){
+                            bolaBranca->inicioQueda(mesa->cacapaMesa[k]);
+                            break;
+                        }
+                    }
+                }
+                if(bolaBranca->emJogo){
+                    for(int i = 0; i < 6; i++){
+                        bolaBranca->colisaoParede(mesa->boxMesa[i]);
+                    }
                 }
             }
-            if(!bolaBranca->estaAtiva()){
+            if(!bolaBranca->estaAtiva() && !bolaBranca->caindo){
+                if(!bolaBranca->emJogo){
+                    bolaBranca->x = posiInic.x;
+                    bolaBranca->y = posiInic.y;
+                    bolaBranca->z = posiInic.z;
+                    bolaBranca->emJogo = true;
+                }
                 estado = CAMERA_LIVRE;
             }
             break;
@@ -276,6 +295,7 @@ int main(int argc, char** argv){
     bolaBranca = new Bola(0, 0.0, 0.0);
     ObjLoader::loadObg(bolaBranca->BolaId, "BolaB.obj", "BolaB.mtl");
     bolaBranca->y = mesa->Ymesa + bolaBranca->Raio;
+    posiInic.y = bolaBranca->y;
     taco = new Taco(2, 0.0, 0.5, 0.0);
     ObjLoader::loadObg(taco->TacoId, "Taco.obj", "Taco.mtl");
 
