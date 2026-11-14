@@ -4,6 +4,11 @@
 #include <algorithm>
 #include <cstdio>
 
+class Box{
+    public:
+        float xmax, xmin, zmax, zmin;
+};
+
 class Mesa{
     public:
         Mesa(unsigned MesaId);
@@ -11,7 +16,9 @@ class Mesa{
         void desenhar();
 
         unsigned MesaId;
-        float Ymesa = 0.000036;
+        float Ymesa = 0.115898;
+        Box boxMesa[6];
+
 };
 
 class Bola{
@@ -21,6 +28,8 @@ class Bola{
         void desenhar();
 
         void atualizaPosicao(float h);
+
+        void colisaoParede(Box box);
 
         bool estaAtiva();
 
@@ -44,7 +53,6 @@ class Taco{
         float elevTaco;
         float theta;
 };
-
 
 
 

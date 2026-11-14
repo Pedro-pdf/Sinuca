@@ -7,7 +7,7 @@ int tamJanelaX = 1024;
 int tamJanelaY = 728;
 
 float CAM_X = 0.0f, CAM_Y = 0.0f, CAM_Z = 0.0f;
-float ALVO_X = 0.0f, ALVO_Y = 0.0f, ALVO_Z = 0.0f;
+float ALVO_X = 0.0f, ALVO_Y = 0.115898f, ALVO_Z = 0.0f;
 
 float raio = 2.0;
 int phy = 70;
@@ -22,7 +22,7 @@ Mesa* mesa = nullptr;
 Bola* bolaBranca = nullptr;
 Taco* taco = nullptr;
 
-enum Estado { CAMERA_LIVRE, MIRANDO, FORCA, IMPACTO, PAUSA_IMPACTO, BOLA_EM_MOVIMENTO };
+enum Estado { CAMERA_LIVRE, MIRANDO, FORCA, IMPACTO, BOLA_EM_MOVIMENTO };
 Estado estado = CAMERA_LIVRE;
 
 float distanciaTaco = 0.15;
@@ -35,10 +35,8 @@ float velocidade;
 float velHorizontal;
 
 float dt = 1.0f/60.0f;
-float SUBSTEPS = 10.0;
+float SUBSTEPS = 5.0;
 float h = dt/SUBSTEPS;
-
-int contadorPausa;
 
 void configuraVisualizacao(void){
     glMatrixMode(GL_MODELVIEW);
@@ -111,7 +109,7 @@ void Desenha(void){
     mesa->desenhar();
     bolaBranca->desenhar();
     
-    if(estado == MIRANDO || estado == FORCA || estado == IMPACTO){
+    if(estado == MIRANDO || estado == FORCA || estado == IMPACTO || distanciaTaco == 0.0){
         float raioTaco = distanciaTaco + bolaBranca->Raio;
         float phyTaco = phy + 8.0f;
         taco->elevTaco = 90 - phyTaco;
@@ -119,9 +117,6 @@ void Desenha(void){
         taco->x = ALVO_X + sin((phyTaco*3.14)/180)*cos((theta*3.14)/180)*raioTaco;
         taco->y = ALVO_Y + cos((phyTaco*3.14)/180)*raioTaco;
         taco->z = ALVO_Z + sin((phyTaco*3.14)/180)*sin((theta*3.14)/180)*raioTaco;
-        taco->desenhar();
-    }
-    else if(estado == PAUSA_IMPACTO){
         taco->desenhar();
     }
     
@@ -151,7 +146,7 @@ void teclado(unsigned char tecla, int x, int y) {
                 limitSPhy = 80;
                 limitBPhy = 30;
                 ALVO_X = 0.0;
-                ALVO_Y = 0.0;
+                ALVO_Y = 0.115898;
                 ALVO_Z = 0.0;
             }
             else if(estado == FORCA){
@@ -165,12 +160,6 @@ void teclado(unsigned char tecla, int x, int y) {
             }
             else if(estado == FORCA){
                 estado = IMPACTO;
-                raio = 1.0;
-                limitSPhy = 80;
-                limitBPhy = 30;
-                ALVO_X = 0.0;
-                ALVO_Y = 0.0;
-                ALVO_Z = 0.0;
                 t = (distanciaTaco - 0.15f) / (0.30f - 0.15f);
                 velocidade = 0.35f + t * t * (7.0f - 0.35f);
                 velHorizontal = velocidade * cos((taco->elevTaco*3.14)/180.0);
@@ -228,7 +217,7 @@ void scroll(int botao, int status, int x, int y) {
 void atualizaCena(int valor){
     switch(estado){
         case FORCA:
-            distanciaTaco += 0.005 * sentido;
+            distanciaTaco += 0.01 * sentido;
             if(distanciaTaco > distanciaTMax){
                 distanciaTaco = distanciaTMax;
                 sentido *= -1;
@@ -240,27 +229,28 @@ void atualizaCena(int valor){
             break;
 
         case IMPACTO:
-            distanciaTaco -= 0.05;
+            distanciaTaco -= 0.1;
             if(distanciaTaco <= 0.0){
-                distanciaTaco = distanciaTMin;
-                contadorPausa = 0;
+                distanciaTaco = 0.0;
+                limitSPhy = 80;
+                limitBPhy = 30;
+                ALVO_X = 0.0;
+                ALVO_Y = 0.115898;
+                ALVO_Z = 0.0;
                 estado = BOLA_EM_MOVIMENTO;
             }
             break;
 
-        case PAUSA_IMPACTO:
-            contadorPausa++;
-            if(contadorPausa >= 30){
-                estado = CAMERA_LIVRE;
-            }
-            break;
-
         case BOLA_EM_MOVIMENTO:
+            distanciaTaco = distanciaTMin;
             raio = 2.0;
             phy = 70;
             theta = 90;
             for (int i = 0; i < SUBSTEPS; i++) {
                 bolaBranca->atualizaPosicao(h);
+                for(int i = 0; i < 6; i++){
+                    bolaBranca->colisaoParede(mesa->boxMesa[i]);
+                }
             }
             if(!bolaBranca->estaAtiva()){
                 estado = CAMERA_LIVRE;
