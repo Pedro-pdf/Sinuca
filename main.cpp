@@ -1,6 +1,7 @@
 #include "loader.hpp"
 #include "elementos.hpp"
 #include <math.h>
+#include <vector>
 #include <GL/glut.h>
 
 int tamJanelaX = 1024;
@@ -21,6 +22,7 @@ float raioMax = 3.0f;
 Mesa* mesa = nullptr;
 Bola* bolaBranca = nullptr;
 Taco* taco = nullptr;
+Bola bolas[15];
 
 enum Estado { CAMERA_LIVRE, MIRANDO, FORCA, IMPACTO, BOLA_EM_MOVIMENTO };
 Estado estado = CAMERA_LIVRE;
@@ -35,7 +37,7 @@ float velocidade;
 float velHorizontal;
 
 float dt = 1.0f/60.0f;
-float SUBSTEPS = 5.0;
+float SUBSTEPS = 10.0;
 float h = dt/SUBSTEPS;
 
 vec3 posiInic(0,0,0);
@@ -110,6 +112,11 @@ void Desenha(void){
     // Mesa
     mesa->desenhar();
     bolaBranca->desenhar();
+    for(int i = 0; i<15; i++){
+        if(bolas[i].emJogo || bolas[i].caindo){
+            bolas[i].desenhar();
+        }
+    }
     
     if(estado == MIRANDO || estado == FORCA || estado == IMPACTO || distanciaTaco == 0.0){
         float raioTaco = distanciaTaco + bolaBranca->Raio;
@@ -136,6 +143,7 @@ void teclado(unsigned char tecla, int x, int y) {
                 estado = MIRANDO;
                 raio = 0.5;
                 raioMax = 1.5;
+                phy = 70;
                 limitSPhy = 70;
                 limitBPhy = 40;
                 ALVO_X = bolaBranca->x;
@@ -145,6 +153,7 @@ void teclado(unsigned char tecla, int x, int y) {
             else if(estado == MIRANDO){
                 estado = CAMERA_LIVRE;
                 raio = 1.0;
+                raioMax = 3.0;
                 limitSPhy = 80;
                 limitBPhy = 30;
                 ALVO_X = 0.0;
@@ -245,10 +254,13 @@ void atualizaCena(int valor){
 
         case BOLA_EM_MOVIMENTO:
             distanciaTaco = distanciaTMin;
-            raio = 2.0;
-            phy = 70;
+            raio = 2.5;
+            phy = 30;
             theta = 90;
             bolaBranca->Queda(dt);
+            for(int i = 0; i<15; i++){
+                bolas[i].Queda(dt);
+            }
             for (int i = 0; i < SUBSTEPS; i++) {
                 if(bolaBranca->emJogo){
                     bolaBranca->atualizaPosicao(h);
@@ -257,15 +269,48 @@ void atualizaCena(int valor){
                             bolaBranca->inicioQueda(mesa->cacapaMesa[k]);
                             break;
                         }
+                        bolaBranca->colisaoParede(mesa->boxMesa[k]);
                     }
                 }
-                if(bolaBranca->emJogo){
-                    for(int i = 0; i < 6; i++){
-                        bolaBranca->colisaoParede(mesa->boxMesa[i]);
+                for(int i = 0; i<15; i++){
+                    if(bolas[i].emJogo){
+                        bolas[i].atualizaPosicao(h);
+                        for (int k = 0; k < 6; k++){
+                            if(bolas[i].caindoCacapa(mesa->cacapaMesa[k])){
+                                bolas[i].inicioQueda(mesa->cacapaMesa[k]);
+                                break;
+                            }
+                        }
+                        for(int k = 0; k<6; k++){
+                            bolas[i].colisaoParede(mesa->boxMesa[k]);
+                        }
                     }
+                }
+
+                for(int i = 0; i<15; i++){
+                    ColisaoBolas(bolaBranca, &bolas[i]);
+                }
+
+                for(int i = 0; i<15; i++){
+                    for(int j = i+1; j<15; j++){
+                        ColisaoBolas(&bolas[i], &bolas[j]);
+                    }
+                }
+
+
+            }
+            bool movimento = false;
+            for(int i = 0; i<15; i++){
+                if(bolas[i].estaAtiva() || bolas[i].caindo){
+                    movimento = true;
+                    break;
                 }
             }
-            if(!bolaBranca->estaAtiva() && !bolaBranca->caindo){
+            if(bolaBranca->estaAtiva() || bolaBranca->caindo){
+                movimento = true;
+            }
+
+            if(!movimento){
                 if(!bolaBranca->emJogo){
                     bolaBranca->x = posiInic.x;
                     bolaBranca->y = posiInic.y;
@@ -273,6 +318,9 @@ void atualizaCena(int valor){
                     bolaBranca->emJogo = true;
                 }
                 estado = CAMERA_LIVRE;
+                limitSPhy = 80;
+                limitBPhy = 30;
+                raioMax = 3.0;
             }
             break;
             
@@ -292,10 +340,37 @@ int main(int argc, char** argv){
 
     mesa = new Mesa(0);
     ObjLoader::loadObg(mesa->MesaId, "Mesa.obj", "Mesa.mtl");
-    bolaBranca = new Bola(0, 0.0, 0.0);
+
+    bolaBranca = new Bola(0, 0.5, 0.0);
     ObjLoader::loadObg(bolaBranca->BolaId, "BolaB.obj", "BolaB.mtl");
-    bolaBranca->y = mesa->Ymesa + bolaBranca->Raio;
     posiInic.y = bolaBranca->y;
+    int contador = 0;
+    float esp = sqrt(3)*bolaBranca->Raio + 0.001f;
+    for(int fileira = 0; fileira<5; fileira++){
+        for(int i = 0; i <= fileira; i++){
+            float x = -0.5 - esp*fileira;
+            float z = (i - fileira / 2.0f) * 2.0 * bolaBranca->Raio;
+            bolas[contador].x = x;
+            bolas[contador].z = z;
+            contador++;
+        }
+    }
+    ObjLoader::loadObg(bolas[0].BolaId, "Bola1.obj", "bola1.mtl");
+    ObjLoader::loadObg(bolas[1].BolaId, "Bola2.obj", "bola2.mtl");
+    ObjLoader::loadObg(bolas[2].BolaId, "Bola3.obj", "bola3.mtl");
+    ObjLoader::loadObg(bolas[3].BolaId, "Bola4.obj", "bola4.mtl");
+    ObjLoader::loadObg(bolas[4].BolaId, "Bola5.obj", "bola5.mtl");
+    ObjLoader::loadObg(bolas[5].BolaId, "Bola6.obj", "bola6.mtl");
+    ObjLoader::loadObg(bolas[6].BolaId, "Bola7.obj", "bola7.mtl");
+    ObjLoader::loadObg(bolas[7].BolaId, "Bola8.obj", "bola8.mtl");
+    ObjLoader::loadObg(bolas[8].BolaId, "Bola9.obj", "bola9.mtl");
+    ObjLoader::loadObg(bolas[9].BolaId, "Bola10.obj", "bola10.mtl");
+    ObjLoader::loadObg(bolas[10].BolaId, "Bola11.obj", "bola11.mtl");
+    ObjLoader::loadObg(bolas[11].BolaId, "Bola12.obj", "bola12.mtl");
+    ObjLoader::loadObg(bolas[12].BolaId, "Bola13.obj", "bola13.mtl");
+    ObjLoader::loadObg(bolas[13].BolaId, "Bola14.obj", "bola14.mtl");
+    ObjLoader::loadObg(bolas[14].BolaId, "Bola15.obj", "bola15.mtl");
+
     taco = new Taco(2, 0.0, 0.5, 0.0);
     ObjLoader::loadObg(taco->TacoId, "Taco.obj", "Taco.mtl");
 

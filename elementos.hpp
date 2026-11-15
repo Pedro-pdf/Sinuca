@@ -30,6 +30,7 @@ class Mesa{
 
 class Bola{
     public:
+        Bola(); 
         Bola(unsigned BolaID, float x, float z);
 
         void desenhar();
@@ -47,7 +48,8 @@ class Bola{
         bool estaAtiva();
 
         unsigned BolaId;
-        float x, y, z;
+        float x, z;
+        float y = 0.115898 + 0.025486;
         float Raio = 0.025486;
         float Vx = 0;
         float Vy = 0;
@@ -58,6 +60,8 @@ class Bola{
         bool emJogo = true;
         bool caindo = false;
 };
+
+void ColisaoBolas(Bola* a, Bola* b);
 
 class Taco{
     public:

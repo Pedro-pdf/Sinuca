@@ -28,7 +28,9 @@ void Mesa::desenhar(){
 }
 
 Bola::Bola(unsigned BolaId, float x, float z)
-    : BolaId(BolaId), x(x), y(0), z(z) {}
+    : BolaId(BolaId), x(x), z(z) {}
+
+Bola::Bola() : Bola(0, 0.0f, 0.0f) {}
 
 void Bola::desenhar(){
     glPushMatrix();
@@ -129,6 +131,42 @@ bool Bola::estaAtiva(){
         return 0;
     }
     return 1;
+}
+
+void ColisaoBolas(Bola* a, Bola* b){
+    if(!a->emJogo || !b->emJogo){
+        return;
+    }
+    float dx = b->x - a->x;
+    float dz = b->z - a->z;
+    float d = sqrt(dx*dx + dz*dz);
+
+    float e = 0.95;
+
+    float soma = 2.0*a->Raio;
+
+    if(d > soma){
+        return;
+    }
+
+    float nx = dx/d;
+    float nz = dz/d;
+
+    float Vrel = (b->Vx - a->Vx)*nx + (b->Vz - a->Vz)*nz;
+    float k = ((1+e) * Vrel)/2;
+
+    a->Vx = a->Vx + k*nx;
+    a->Vz = a->Vz + k*nz;
+
+    b->Vx = b->Vx -k*nx;
+    b->Vz = b->Vz -k*nz;
+
+    float pen = soma - d;
+
+    a->x -= (nx * pen)/2.0; 
+    a->z -= (nz * pen)/2.0;
+    b->x += (nx * pen)/2.0;
+    b->z += (nz * pen)/2.0;
 }
 
 Taco::Taco(unsigned TacoId, float x, float y, float z)
