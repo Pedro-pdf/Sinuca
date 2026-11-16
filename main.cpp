@@ -3,6 +3,14 @@
 #include <math.h>
 #include <vector>
 #include <GL/glut.h>
+#include <cstdio>
+#include <algorithm>
+
+GLdouble matModelo[16], matProj[16];
+GLint viewport[4];
+
+float offX = 0, offZ = 0;
+float ultimoValidoX, ultimoValidoZ;
 
 int tamJanelaX = 1024;
 int tamJanelaY = 728;
@@ -11,8 +19,8 @@ float CAM_X = 0.0f, CAM_Y = 0.0f, CAM_Z = 0.0f;
 float ALVO_X = 0.0f, ALVO_Y = 0.115898f, ALVO_Z = 0.0f;
 
 float raio = 2.0;
-int phy = 70;
-int theta = 0;
+float phy = 70.0;
+float theta = 0.0;
 int limitSPhy = 80;
 int limitBPhy = 30;
 
@@ -23,8 +31,9 @@ Mesa* mesa = nullptr;
 Bola* bolaBranca = nullptr;
 Taco* taco = nullptr;
 Bola bolas[15];
+unsigned int cenarioId;
 
-enum Estado { CAMERA_LIVRE, MIRANDO, FORCA, IMPACTO, BOLA_EM_MOVIMENTO };
+enum Estado { CAMERA_LIVRE, MIRANDO, FORCA, IMPACTO, BOLA_EM_MOVIMENTO, POSICIONANDO };
 Estado estado = CAMERA_LIVRE;
 
 float distanciaTaco = 0.15;
@@ -40,7 +49,37 @@ float dt = 1.0f/60.0f;
 float SUBSTEPS = 10.0;
 float h = dt/SUBSTEPS;
 
-vec3 posiInic(0,0,0);
+int tempoAnterior = 0;
+float acumulador = 0.0f;
+float escalaTempo = 0.5f;
+
+void reiniciaJogo(void){
+    estado = CAMERA_LIVRE;
+    int contador = 0;
+    float esp = sqrt(3)*bolaBranca->Raio + 0.001f;
+    for(int fileira = 0; fileira<5; fileira++){
+        for(int i = 0; i <= fileira; i++){
+            float x = -0.5 - esp*fileira;
+            float z = (i - fileira / 2.0f) * 2.0 * bolaBranca->Raio;
+            bolas[contador].x = x;
+            bolas[contador].z = z;
+            bolas[contador].y = bolaBranca->Raio + mesa->Ymesa;
+            bolas[contador].caindo = false;
+            bolas[contador].emJogo = true;
+            bolas[contador].Vx = 0.0;
+            bolas[contador].Vz = 0.0;
+            
+            contador++;
+        }
+    }
+    bolaBranca->caindo = false;
+    bolaBranca->emJogo = true;
+    bolaBranca->Vx = 0.0;
+    bolaBranca->Vz = 0.0;
+    bolaBranca->x = 0.5;
+    bolaBranca->z = 0.0;
+    bolaBranca->y = bolaBranca->Raio + mesa->Ymesa;
+}
 
 void configuraVisualizacao(void){
     glMatrixMode(GL_MODELVIEW);
@@ -97,8 +136,35 @@ void Inicializa(void)
     glShadeModel(GL_SMOOTH);
 }
 
+void criarMatrizSombra(float matrizSombra[16], float plano[4], float posLuz[4]) {
+    float dot = plano[0] * posLuz[0] +
+                plano[1] * posLuz[1] +
+                plano[2] * posLuz[2] +
+                plano[3] * posLuz[3];
+
+    matrizSombra[0]  = dot - posLuz[0] * plano[0];
+    matrizSombra[4]  = 0.0f - posLuz[0] * plano[1];
+    matrizSombra[8]  = 0.0f - posLuz[0] * plano[2];
+    matrizSombra[12] = 0.0f - posLuz[0] * plano[3];
+
+    matrizSombra[1]  = 0.0f - posLuz[1] * plano[0];
+    matrizSombra[5]  = dot - posLuz[1] * plano[1];
+    matrizSombra[9]  = 0.0f - posLuz[1] * plano[2];
+    matrizSombra[13] = 0.0f - posLuz[1] * plano[3];
+
+    matrizSombra[2]  = 0.0f - posLuz[2] * plano[0];
+    matrizSombra[6]  = 0.0f - posLuz[2] * plano[1];
+    matrizSombra[10] = dot - posLuz[2] * plano[2];
+    matrizSombra[14] = 0.0f - posLuz[2] * plano[3];
+
+    matrizSombra[3]  = 0.0f - posLuz[3] * plano[0];
+    matrizSombra[7]  = 0.0f - posLuz[3] * plano[1];
+    matrizSombra[11] = 0.0f - posLuz[3] * plano[2];
+    matrizSombra[15] = dot - posLuz[3] * plano[3];
+}
+
 void Desenha(void){
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     atualizarCamera();
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
@@ -106,11 +172,66 @@ void Desenha(void){
               ALVO_X, ALVO_Y, ALVO_Z,
               0.0f, 1.0f, 0.0f);
 
-    GLfloat posLuz[] = { 2.0f, 6.0f, 3.0f, 1.0f };
-    glLightfv(GL_LIGHT0, GL_POSITION, posLuz);
+    GLfloat posLuz[] = { 0.0f, 1.5f, 0.0f, 1.0f };
 
-    // Mesa
+    float planoChao[4] = { 0.0f, 1.0f, 0.0f, -1*mesa->Ymesa };
+    float matrizSombra[16];
+    
+    glLightfv(GL_LIGHT0, GL_POSITION, posLuz);
+    
+    glGetDoublev(GL_MODELVIEW_MATRIX, matModelo);
+    glGetDoublev(GL_PROJECTION_MATRIX, matProj);
+    glGetIntegerv(GL_VIEWPORT, viewport);
+
+
+    glEnable(GL_STENCIL_TEST);
+    glStencilFunc(GL_ALWAYS, 1, 0xFF);
+    glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
     mesa->desenhar();
+
+    glStencilFunc(GL_EQUAL, 1, 0xFF);
+    glStencilOp(GL_KEEP, GL_KEEP, GL_ZERO);
+
+    glEnable(GL_POLYGON_OFFSET_FILL);
+    glPolygonOffset(-1.0f, -1.0f);
+
+    glDisable(GL_LIGHTING);
+    glDisable(GL_TEXTURE_2D);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glColor4f(0.0f, 0.0f, 0.0f, 0.5f);
+
+    glPushMatrix();
+        criarMatrizSombra(matrizSombra, planoChao, posLuz);
+        glMultMatrixf(matrizSombra);
+        if(!bolaBranca->caindo){
+            bolaBranca->desenhar();
+        }
+        for(int i = 0; i<15; i++){
+            if(bolas[i].emJogo){
+                bolas[i].desenhar();
+            }
+        }
+
+        if(estado == MIRANDO || estado == FORCA || estado == IMPACTO || distanciaTaco == 0.0){
+            float raioTaco = distanciaTaco + bolaBranca->Raio;
+            float phyTaco = phy + 8.0f;
+            taco->elevTaco = 90 - phyTaco;
+            taco->theta = theta;
+            taco->x = ALVO_X + sin((phyTaco*3.14)/180)*cos((theta*3.14)/180)*raioTaco;
+            taco->y = ALVO_Y + cos((phyTaco*3.14)/180)*raioTaco;
+            taco->z = ALVO_Z + sin((phyTaco*3.14)/180)*sin((theta*3.14)/180)*raioTaco;
+            taco->desenhar();
+        }
+    glPopMatrix();
+
+    glDisable(GL_BLEND);
+    glDisable(GL_POLYGON_OFFSET_FILL);
+    glDisable(GL_STENCIL_TEST);
+    glEnable(GL_LIGHTING);
+
     bolaBranca->desenhar();
     for(int i = 0; i<15; i++){
         if(bolas[i].emJogo || bolas[i].caindo){
@@ -128,37 +249,141 @@ void Desenha(void){
         taco->z = ALVO_Z + sin((phyTaco*3.14)/180)*sin((theta*3.14)/180)*raioTaco;
         taco->desenhar();
     }
+    glPushMatrix();
+    glCallList(cenarioId);
+    glPopMatrix();
     
     glutSwapBuffers();
+}
+
+bool clicouNaBola(int mx, int my) {
+    double yTela = viewport[3] - my;
+
+    double x0, y0, z0, x1, y1, z1;
+    gluUnProject(mx, yTela, 0.0, matModelo, matProj, viewport, &x0, &y0, &z0);
+    gluUnProject(mx, yTela, 1.0, matModelo, matProj, viewport, &x1, &y1, &z1);
+
+    double dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
+    double len = sqrt(dx*dx + dy*dy + dz*dz);
+    dx /= len;  dy /= len;  dz /= len;
+
+    double ox = x0 - bolaBranca->x;
+    double oy = y0 - bolaBranca->y;
+    double oz = z0 - bolaBranca->z;
+    double r  = bolaBranca->Raio;
+
+    double b = ox*dx + oy*dy + oz*dz;
+    double c = ox*ox + oy*oy + oz*oz - r*r;
+    double disc = b*b - c;
+
+    if(disc >= 0){
+        glutSetCursor(GLUT_CURSOR_INFO);
+        return true;
+    }
+    return false;
+}
+
+bool cliqueNaMesa(int mx, int my, float& px, float& pz) {
+    double yTela = viewport[3] - my;
+    double x0, y0, z0, x1, y1, z1;
+    gluUnProject(mx, yTela, 0.0, matModelo, matProj, viewport, &x0, &y0, &z0);
+    gluUnProject(mx, yTela, 1.0, matModelo, matProj, viewport, &x1, &y1, &z1);
+
+    double dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
+    if (fabs(dy) < 1e-9) return false;
+
+    double Yp = mesa->Ymesa + bolaBranca->Raio;
+    double tt = (Yp - y0) / dy;
+    if (tt < 0) return false;
+
+    px = x0 + tt * dx;
+    pz = z0 + tt * dz;
+    return true;
+}
+
+bool posicaoValida(float px, float pz) {
+
+    if(px > mesa->limitXmax || px < mesa->limitXmin){
+        return false;
+    }
+
+    if(pz > mesa->limitZmax || pz < mesa->limitZmin){
+        return false;
+    }
+
+    for (int k = 0; k < 6; k++) {
+        Box& b = mesa->boxMesa[k];
+        float cx = std::max(b.xmin, std::min(px, b.xmax));
+        float cz = std::max(b.zmin, std::min(pz, b.zmax));
+        float dx = px - cx, dz = pz - cz;
+        if (dx*dx + dz*dz < bolaBranca->Raio * bolaBranca->Raio) return false;
+    }
+
+    for (int k = 0; k < 6; k++) {
+        float dx = px - mesa->cacapaMesa[k].xCa, dz = pz - mesa->cacapaMesa[k].zCa;
+        float r = mesa->cacapaMesa[k].raioCa;
+        if (dx*dx + dz*dz < r*r) return false;
+    }
+
+    for (int i = 0; i < 15; i++) {
+        if (!bolas[i].emJogo) continue;
+        float dx = px - bolas[i].x, dz = pz - bolas[i].z;
+        float s = 2.0f * bolaBranca->Raio;
+        if (dx*dx + dz*dz < s*s) return false;
+    }
+    return true;
+}
+
+void iniciarArrasto(int mx, int my) {
+    float px, pz;
+
+    if(!cliqueNaMesa(mx, my, px, pz)){
+        return;
+    }
+
+    offX = bolaBranca->x - px;
+    offZ = bolaBranca->z - pz;
+    ultimoValidoX = bolaBranca->x;
+    ultimoValidoZ = bolaBranca->z;
+    estado = POSICIONANDO;
+}
+
+void arrastar(int mx, int my) {
+    if(estado != POSICIONANDO){
+        return;
+    }
+
+    float px, pz;
+
+    if (!cliqueNaMesa(mx, my, px, pz)){
+        return;
+    }
+
+    float nx = px + offX, nz = pz + offZ;
+    if (posicaoValida(nx, nz)) {
+        bolaBranca->x = nx;
+        bolaBranca->z = nz;
+        ultimoValidoX = nx;
+        ultimoValidoZ = nz;
+    }
+    glutPostRedisplay();
 }
 
 void teclado(unsigned char tecla, int x, int y) {
     switch (tecla) {
         case 27:
-            exit(0);
+            reiniciaJogo();
             break;
 
         case 13:
             if(estado == CAMERA_LIVRE){
+                phy = 70;
                 estado = MIRANDO;
                 raio = 0.5;
-                raioMax = 1.5;
-                phy = 70;
-                limitSPhy = 70;
-                limitBPhy = 40;
-                ALVO_X = bolaBranca->x;
-                ALVO_Y = bolaBranca->y;
-                ALVO_Z = bolaBranca->z;
             }
             else if(estado == MIRANDO){
                 estado = CAMERA_LIVRE;
                 raio = 1.0;
-                raioMax = 3.0;
-                limitSPhy = 80;
-                limitBPhy = 30;
-                ALVO_X = 0.0;
-                ALVO_Y = 0.115898;
-                ALVO_Z = 0.0;
             }
             else if(estado == FORCA){
                 estado = MIRANDO;
@@ -199,13 +424,62 @@ void teclado(unsigned char tecla, int x, int y) {
 
         case 'a':
             if(estado != FORCA){
-                theta = (theta+2)%360;
+                theta += 2;
+                if(theta >= 360){
+                    theta -= 360;
+                }
                 break;
             }
 
         case 'd':
             if(estado != FORCA){
-                theta = (theta-2)%360;
+                theta -= 2;
+                if(theta < 0.0){
+                    theta += 360;
+                }
+                break;
+            }
+
+    }
+
+    glutPostRedisplay();
+}
+
+void tecladoEspecial(int tecla, int x, int y) {
+    switch (tecla) {
+        case GLUT_KEY_UP:
+            if(estado != FORCA){
+                phy -= 0.5;
+                if(phy < limitBPhy){
+                    phy = limitBPhy;
+                }
+                break;
+            }
+
+        case GLUT_KEY_DOWN:
+            if(estado != FORCA){
+                phy += 0.5;
+                if(phy > limitSPhy){
+                    phy = limitSPhy;
+                }
+                break;
+            }
+
+        case GLUT_KEY_LEFT:
+            if(estado != FORCA){
+                theta += 0.5;
+                if(theta >= 360){
+                    theta -= 360;
+                }
+                break;
+            }
+
+        case GLUT_KEY_RIGHT:
+            if(estado != FORCA){
+                theta -= 0.5;
+                if(theta < 0.0){
+                    theta += 360;
+                }
                 break;
             }
     }
@@ -214,6 +488,18 @@ void teclado(unsigned char tecla, int x, int y) {
 }
 
 void scroll(int botao, int status, int x, int y) {
+    if(botao == GLUT_LEFT_BUTTON){
+        if(status == GLUT_DOWN){
+            if(estado == POSICIONANDO){
+                estado = CAMERA_LIVRE;
+                glutSetCursor(GLUT_CURSOR_LEFT_ARROW);
+            }
+            else if(estado == CAMERA_LIVRE && clicouNaBola(x, y)){
+                iniciarArrasto(x, y);
+            }
+        }
+        return;
+    }
     if(status != GLUT_DOWN){
         return;
     }
@@ -226,108 +512,147 @@ void scroll(int botao, int status, int x, int y) {
 }
 
 void atualizaCena(int valor){
-    switch(estado){
-        case FORCA:
-            distanciaTaco += 0.01 * sentido;
-            if(distanciaTaco > distanciaTMax){
-                distanciaTaco = distanciaTMax;
-                sentido *= -1;
-            }
-            else if(distanciaTaco < distanciaTMin){
-                distanciaTaco = distanciaTMin;
-                sentido *= -1;
-            }
-            break;
+    int agora = glutGet(GLUT_ELAPSED_TIME);
+    float real = (agora - tempoAnterior) / 1000.0f;
+    tempoAnterior = agora;
+    if(real > 0.1f){
+        real = 0.1f;
+    }
 
-        case IMPACTO:
-            distanciaTaco -= 0.1;
-            if(distanciaTaco <= 0.0){
-                distanciaTaco = 0.0;
+    acumulador += real * escalaTempo;
+    while(acumulador >= dt){
+        switch(estado){
+            case POSICIONANDO:
                 limitSPhy = 80;
                 limitBPhy = 30;
+                raioMin = 0.5f;
+                raioMax = 3.0f;
+                break;
+    
+            case CAMERA_LIVRE:
+                limitSPhy = 80;
+                limitBPhy = 30;
+                raioMin = 0.5f;
+                raioMax = 3.0f;
                 ALVO_X = 0.0;
                 ALVO_Y = 0.115898;
                 ALVO_Z = 0.0;
-                estado = BOLA_EM_MOVIMENTO;
-            }
-            break;
-
-        case BOLA_EM_MOVIMENTO:
-            distanciaTaco = distanciaTMin;
-            raio = 2.5;
-            phy = 30;
-            theta = 90;
-            bolaBranca->Queda(dt);
-            for(int i = 0; i<15; i++){
-                bolas[i].Queda(dt);
-            }
-            for (int i = 0; i < SUBSTEPS; i++) {
-                if(bolaBranca->emJogo){
-                    bolaBranca->atualizaPosicao(h);
-                    for (int k = 0; k < 6; k++){
-                        if(bolaBranca->caindoCacapa(mesa->cacapaMesa[k])){
-                            bolaBranca->inicioQueda(mesa->cacapaMesa[k]);
-                            break;
-                        }
-                        bolaBranca->colisaoParede(mesa->boxMesa[k]);
-                    }
+                break;
+    
+            case MIRANDO:
+                raioMax = 1.5;
+                limitSPhy = 70;
+                limitBPhy = 40;
+                ALVO_X = bolaBranca->x;
+                ALVO_Y = bolaBranca->y;
+                ALVO_Z = bolaBranca->z;
+                break;
+    
+            case FORCA:
+                distanciaTaco += 0.01 * sentido;
+                if(distanciaTaco > distanciaTMax){
+                    distanciaTaco = distanciaTMax;
+                    sentido *= -1;
                 }
+                else if(distanciaTaco < distanciaTMin){
+                    distanciaTaco = distanciaTMin;
+                    sentido *= -1;
+                }
+                break;
+    
+            case IMPACTO:
+                distanciaTaco -= 0.1;
+                if(distanciaTaco <= 0.0){
+                    distanciaTaco = 0.0;
+                    ALVO_X = 0.0;
+                    ALVO_Y = 0.115898;
+                    ALVO_Z = 0.0;
+                    estado = BOLA_EM_MOVIMENTO;
+                }
+                break;
+    
+            case BOLA_EM_MOVIMENTO:
+                distanciaTaco = distanciaTMin;
+                raio = 2.5;
+                phy = 30;
+                theta = 90;
+                bolaBranca->Queda(dt);
                 for(int i = 0; i<15; i++){
-                    if(bolas[i].emJogo){
-                        bolas[i].atualizaPosicao(h);
+                    bolas[i].Queda(dt);
+                }
+                for (int i = 0; i < SUBSTEPS; i++) {
+                    if(bolaBranca->emJogo){
+                        bolaBranca->atualizaPosicao(h);
                         for (int k = 0; k < 6; k++){
-                            if(bolas[i].caindoCacapa(mesa->cacapaMesa[k])){
-                                bolas[i].inicioQueda(mesa->cacapaMesa[k]);
+                            if(bolaBranca->caindoCacapa(mesa->cacapaMesa[k])){
+                                bolaBranca->inicioQueda(mesa->cacapaMesa[k]);
                                 break;
                             }
-                        }
-                        for(int k = 0; k<6; k++){
-                            bolas[i].colisaoParede(mesa->boxMesa[k]);
+                            bolaBranca->colisaoParede(mesa->boxMesa[k]);
                         }
                     }
+                    for(int i = 0; i<15; i++){
+                        if(bolas[i].emJogo){
+                            bolas[i].atualizaPosicao(h);
+                            for (int k = 0; k < 6; k++){
+                                if(bolas[i].caindoCacapa(mesa->cacapaMesa[k])){
+                                    bolas[i].inicioQueda(mesa->cacapaMesa[k]);
+                                    break;
+                                }
+                            }
+                            for(int k = 0; k<6; k++){
+                                bolas[i].colisaoParede(mesa->boxMesa[k]);
+                            }
+                        }
+                    }
+    
+                    for(int i = 0; i<15; i++){
+                        ColisaoBolas(bolaBranca, &bolas[i]);
+                    }
+    
+                    for(int i = 0; i<15; i++){
+                        for(int j = i+1; j<15; j++){
+                            ColisaoBolas(&bolas[i], &bolas[j]);
+                        }
+                    }
+    
+    
                 }
-
+                bool movimento = false;
                 for(int i = 0; i<15; i++){
-                    ColisaoBolas(bolaBranca, &bolas[i]);
-                }
-
-                for(int i = 0; i<15; i++){
-                    for(int j = i+1; j<15; j++){
-                        ColisaoBolas(&bolas[i], &bolas[j]);
+                    if(bolas[i].estaAtiva() || bolas[i].caindo){
+                        movimento = true;
+                        break;
                     }
                 }
-
-
-            }
-            bool movimento = false;
-            for(int i = 0; i<15; i++){
-                if(bolas[i].estaAtiva() || bolas[i].caindo){
+                if(bolaBranca->estaAtiva() || bolaBranca->caindo){
                     movimento = true;
-                    break;
                 }
-            }
-            if(bolaBranca->estaAtiva() || bolaBranca->caindo){
-                movimento = true;
-            }
-
-            if(!movimento){
-                if(!bolaBranca->emJogo){
-                    bolaBranca->x = posiInic.x;
-                    bolaBranca->y = posiInic.y;
-                    bolaBranca->z = posiInic.z;
-                    bolaBranca->emJogo = true;
+    
+                if(!movimento){
+                    if(!bolaBranca->emJogo){
+                        estado = POSICIONANDO;
+                        glutSetCursor(GLUT_CURSOR_INFO);
+                        offX = 0;
+                        offZ = 0;
+                        ultimoValidoX = bolaBranca->x;
+                        ultimoValidoZ = bolaBranca->z;
+                        bolaBranca->emJogo = true;
+                        bolaBranca->y = mesa->Ymesa + bolaBranca->Raio;
+                    }
+                    else{
+                        estado = CAMERA_LIVRE;
+                    }
                 }
-                estado = CAMERA_LIVRE;
-                limitSPhy = 80;
-                limitBPhy = 30;
-                raioMax = 3.0;
-            }
-            break;
-            
+                break;
+    
+    
+        }
+        acumulador -= dt;
     }
 
     glutPostRedisplay();
-    glutTimerFunc(16, atualizaCena, 0);
+    glutTimerFunc(1, atualizaCena, 0);
 }
 
 int main(int argc, char** argv){
@@ -343,7 +668,6 @@ int main(int argc, char** argv){
 
     bolaBranca = new Bola(0, 0.5, 0.0);
     ObjLoader::loadObg(bolaBranca->BolaId, "BolaB.obj", "BolaB.mtl");
-    posiInic.y = bolaBranca->y;
     int contador = 0;
     float esp = sqrt(3)*bolaBranca->Raio + 0.001f;
     for(int fileira = 0; fileira<5; fileira++){
@@ -374,19 +698,18 @@ int main(int argc, char** argv){
     taco = new Taco(2, 0.0, 0.5, 0.0);
     ObjLoader::loadObg(taco->TacoId, "Taco.obj", "Taco.mtl");
 
+    ObjLoader::loadObg(cenarioId, "cenario.obj", "cenario.mtl");
+
 
     glutDisplayFunc(Desenha);
     glutReshapeFunc(AlteraTamanhoJanela);
     glutKeyboardFunc(teclado);
+    glutSpecialFunc(tecladoEspecial);
     glutMouseFunc(scroll);
-    glutTimerFunc(16, atualizaCena, 0);
+    glutPassiveMotionFunc(arrastar);
+    tempoAnterior = glutGet(GLUT_ELAPSED_TIME);
+    glutTimerFunc(1, atualizaCena, 0);
 
     glutMainLoop();
     return 0;
 }
-
-
-
-//2.36
-//0.19397
-//1.37

@@ -19,6 +19,11 @@ Mesa::Mesa(unsigned MesaId) : MesaId(MesaId) {
     cacapaMesa[3] = {-1.11006, 0.570423};
     cacapaMesa[4] = {-0.000057, -0.587131};
     cacapaMesa[5] = {-0.000057, 0.587131};
+
+    limitXmax = 1.209;
+    limitXmin = -1.081;
+    limitZmax = 0.672;
+    limitZmin = -0.669;
 }
 
 void Mesa::desenhar(){
@@ -28,13 +33,22 @@ void Mesa::desenhar(){
 }
 
 Bola::Bola(unsigned BolaId, float x, float z)
-    : BolaId(BolaId), x(x), z(z) {}
+    : BolaId(BolaId), x(x), z(z) {
+        for (int i = 0; i < 16; i++) {
+        if (i % 5 == 0) {
+            rot[i] = 1.0f;
+        } else {
+            rot[i] = 0.0f;
+        }
+    }
+}
 
 Bola::Bola() : Bola(0, 0.0f, 0.0f) {}
 
 void Bola::desenhar(){
     glPushMatrix();
     glTranslatef(x, y, z);
+    glMultMatrixf(rot);
     glCallList(BolaId);
     glPopMatrix();
 }
@@ -51,7 +65,15 @@ void Bola::atualizaPosicao(float h){
         Vz = Vz + az*h;
         
         x = x + Vx*h;
-        z = z+ Vz*h;
+        z = z + Vz*h;
+
+        float angulo = (180/3.14) * (velocidade*h)/Raio;
+        glPushMatrix();
+        glLoadIdentity();
+        glRotatef(angulo, Vz, 0.0f, -Vx);
+        glMultMatrixf(rot);
+        glGetFloatv(GL_MODELVIEW_MATRIX, rot);
+        glPopMatrix();
     }
     else{
         Vx = 0.0;
@@ -99,8 +121,6 @@ void Bola::inicioQueda(Cacapa ca){
     Vy = 0;
     cx = ca.xCa;
     cz = ca.zCa;
-    Vx = 0;
-    Vz = 0;
 }
 
 void Bola::Queda(float dt){
@@ -114,6 +134,14 @@ void Bola::Queda(float dt){
         float f = dt / 0.15f;
         x += (cx - x) * f;
         z += (cz - z) * f;
+        float angulo = 0.5;
+
+        glPushMatrix();
+        glLoadIdentity();
+        glRotatef(angulo, Vz, 0.0f, -Vx);
+        glMultMatrixf(rot);
+        glGetFloatv(GL_MODELVIEW_MATRIX, rot);
+        glPopMatrix();
     }
 
     Vy -= 10 * dt;
@@ -122,7 +150,11 @@ void Bola::Queda(float dt){
         y = FUNDOCA;
     }
 
-    if (tempoQueda >= 1.0) caindo = false;
+    if (tempoQueda >= 1.0){
+        caindo = false;
+        Vx = 0.0;
+        Vz = 0.0;
+    }
 
 }
 
@@ -181,9 +213,3 @@ void Taco::desenhar(){
     glPopMatrix();
 }
 
-
-
-
-//0.03632
-//0.095292
-//1.50102

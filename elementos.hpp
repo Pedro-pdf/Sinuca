@@ -23,6 +23,10 @@ class Mesa{
 
         unsigned MesaId;
         float Ymesa = 0.115898;
+        float limitXmax;
+        float limitXmin;
+        float limitZmax;
+        float limitZmin;
         Box boxMesa[6];
         Cacapa cacapaMesa[6];
 
@@ -59,6 +63,7 @@ class Bola{
         float tempoQueda;
         bool emJogo = true;
         bool caindo = false;
+        float rot[16];
 };
 
 void ColisaoBolas(Bola* a, Bola* b);
