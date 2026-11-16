@@ -406,7 +406,7 @@ void teclado(unsigned char tecla, int x, int y) {
 
         case 'w':
             if(estado != FORCA){
-                phy -= 2;
+                phy -= 3;
                 if(phy < limitBPhy){
                     phy = limitBPhy;
                 }
@@ -415,7 +415,7 @@ void teclado(unsigned char tecla, int x, int y) {
 
         case 's':
             if(estado != FORCA){
-                phy += 2;
+                phy += 3;
                 if(phy > limitSPhy){
                     phy = limitSPhy;
                 }
@@ -424,7 +424,7 @@ void teclado(unsigned char tecla, int x, int y) {
 
         case 'a':
             if(estado != FORCA){
-                theta += 2;
+                theta += 3;
                 if(theta >= 360){
                     theta -= 360;
                 }
@@ -433,7 +433,7 @@ void teclado(unsigned char tecla, int x, int y) {
 
         case 'd':
             if(estado != FORCA){
-                theta -= 2;
+                theta -= 3;
                 if(theta < 0.0){
                     theta += 360;
                 }

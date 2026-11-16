@@ -55,7 +55,7 @@ void Bola::desenhar(){
 
 void Bola::atualizaPosicao(float h){
     float velocidade = sqrt(Vx*Vx + Vz*Vz);
-    float atrito = 0.3 * 10.0;
+    float atrito = 0.2 * 10.0;
 
     if(velocidade > atrito*h){
         float ax = -(Vx/velocidade)*atrito;
